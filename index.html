@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Styrkekompassen</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 650px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        h1, h2, h3 { color: #2c3e50; text-align: center; }
+        .statement { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .options { display: flex; justify-content: space-between; margin-top: 8px; }
+        .btn-score { flex: 1; margin: 0 4px; padding: 10px; border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-score.active { background: #3498db; color: white; border-color: #3498db; }
+        .btn-action { display: block; width: 100%; padding: 12px; background: #2ecc71; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+        .btn-action:hover { background: #27ae60; }
+        #result-container { display: none; margin-top: 30px; }
+        .chart-box { text-align: center; margin-bottom: 30px; display: flex; justify-content: center; }
+        canvas { background: #fff; max-width: 100%; height: auto; border: 1px solid #eee; border-radius: 8px; }
+        
+        /* Branschmatchning & Yrken-styling */
+        .industry-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 12px; text-align: left; }
+        .industry-card.top-match { border-color: #2ecc71; background: #f0fdf4; }
+        .industry-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        .top-badge { background: #2ecc71; color: white; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+        .progress-bar { background: #e2e8f0; border-radius: 4px; height: 10px; margin-top: 8px; overflow: hidden; }
+        .progress-fill { background: #3498db; height: 100%; width: 0%; transition: width 1s ease-in-out; }
+        .industry-card.top-match .progress-fill { background: #2ecc71; }
+        .industry-desc { font-size: 13px; color: #64748b; margin-top: 6px; }
+        
+        /* Yrkes-taggar */
+        .jobs-container { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+        .job-tag { background: #e2e8f0; color: #334155; font-size: 12px; padding: 4px 10px; border-radius: 4px; font-weight: 500; }
+        .industry-card.top-match .job-tag { background: #dcfce7; color: #166534; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Styrkekompassen 🧭</h1>
+    <p style="text-align: center; color: #666;">Hitta dina unika karaktärsstyrkor och matcha dem mot arbetsmarknaden.</p>
+
+    <div id="questions-container"></div>
+    <button class="btn-action" onclick="visaResultat()">Visa resultat</button>
+
+    <div id="result-container">
+        <h2>Din Styrkeprofil</h2>
+        <div class="chart-box">
+            <canvas id="myCanvas" width="500" height="500"></canvas>
+        </div>
+
+        <h3>Dina matchande branscher & yrken 💼</h3>
+        <div id="industries-container"></div>
+    </div>
+</div>
+
+<script>
+    const fragor = [
+        "Jag tar ofta initiativ i grupparbeten.",
+        "Jag är bra på att lyssna när andra har det svårt.",
+        "Jag gillar att analysera komplexa problem.",
+        "Jag håller humöret uppe även när det är stressigt.",
+        "Jag har lätt för att komma på nya, kreativa idéer.",
+        "Jag är noggrann och ser till att detaljer blir rätt.",
+        "Jag motiveras av att leda och organisera projekt.",
+        "Jag har lätt för att samarbeta med olika typer av människor.",
+        "Jag tycker om att lära mig nya system och tekniska verktyg.",
+        "Melodier, design eller skapande är en viktig del av min vardag.",
+        "Jag är bra på att kompromissa och lösa konflikter.",
+        "Jag drivs av att nå uppsatta mål och se konkreta resultat."
+    ];
+
+    const labels = [
+        'Initiativ', 'Empati', 'Analys', 'Resiliens', 
+        'Kreativitet', 'Noggrannhet', 'Ledarskap', 'Samarbete', 
+        'Teknik', 'Skapande', 'Konflikthantering', 'Målfokus'
+    ];
+
+    const branscher = [
+        {
+            namn: "Teknik, IT & Data 🖥️",
+            desc: "Passar dig som gillar problemlösning, logik och att förstå avancerade system.",
+            viktigaEgenskaper: [2, 5, 8], // Kopplar till: Analys (2), Noggrannhet (5), Teknik (8)
+            yrken: ["Systemutvecklare", "Dataanalytiker", "IT-säkerhetsspecialist", "Nätverkstekniker"]
+        },
+        {
+            namn: "Vård, Omsorg & Utbildning 🏥",
+            desc: "Här står människan i centrum. Perfekt för dig som drivs av medmänsklighet och kommunikation.",
+            viktigaEgenskaper: [1, 7, 10], // Kopplar till: Empati (1), Samarbete (7), Konflikthantering (10)
+            yrken: ["Sjuksköterska", "Lärare", "Psykolog", "Socionom", "Fysioterapeut"]
+        },
+        {
+            namn: "Ledarskap, Projektledning & Företagande 🚀",
+            desc: "För dig som gillar att driva saker framåt, strukturera uppgifter och motivera andra.",
+            viktigaEgenskaper: [0, 6, 11], // Kopplar till: Initiativ (0), Ledarskap (6), Målfokus (11)
+            yrken: ["Projektledare", "Egenföretagare", "Enhetschef", "Managementkonsult"]
+        },
+        {
+            namn: "Kreativa branscher, Media & Design 🎨",
+            desc: "Konstnärliga och nyskapande yrken där din vision och estetik får ta plats.",
+            viktigaEgenskaper: [4, 7, 9], // Kopplar till: Kreativitet (4), Samarbete (7), Skapande (9)
+            yrken: ["UX-designer", "Copywriter", "Art Director", "Innehållsproducent"]
+        },
+        {
+            namn: "Administration, Ekonomi & Juridik 📊",
+            desc: "Passar dig som trivs bäst i strukturerade miljöer där noggrannhet och analys är nyckeln.",
+            viktigaEgenskaper: [2, 3, 5], // Kopplar till: Analys (2), Resiliens (3), Noggrannhet (5)
+            yrken: ["Ekonom", "Jurist", "HR-specialist", "Revisor", "Administratör"]
+        }
+    ];
+
+
+       const container = document.getElementById("questions-container");
+    const userAnswers = {};
+
+    // Generera frågor på sidan direkt vid start
+    fragor.forEach((fraga, index) => {
+        const div = document.createElement("div");
+        div.className = "statement";
+        div.innerHTML = `
+            <p><strong>Fråga ${index + 1}:</strong> ${fraga}</p>
+            <div class="options">
+                <button class="btn-score" onclick="selectScore(this, ${index}, 1)">1</button>
+                <button class="btn-score" onclick="selectScore(this, ${index}, 2)">2</button>
+                <button class="btn-score" onclick="selectScore(this, ${index}, 3)">3</button>
+                <button class="btn-score" onclick="selectScore(this, ${index}, 4)">4</button>
+                <button class="btn-score" onclick="selectScore(this, ${index}, 5)">5</button>
+            </div>
+        `;
+        container.appendChild(div);
+    });
+
+    function selectScore(btn, questionIndex, score) {
+        const parent = btn.parentElement;
+        parent.querySelectorAll('.btn-score').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        userAnswers[questionIndex] = score;
+    }
+
+    function visaResultat() {
+        const totalFragor = fragor.length;
+        const besvarade = Object.keys(userAnswers).length;
+        
+        if (besvarade < totalFragor) {
+            alert(`Vänligen svara på alla frågor innan du visar resultatet (${besvarade} av ${totalFragor} besvarade).`);
+            return;
+        }
+
+        document.getElementById("result-container").style.display = "block";
+        
+        ritaNativeRadardiagram();
+        beraknaOchVisaBranscher();
+
+        document.getElementById("result-container").scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function beraknaOchVisaBranscher() {
+        const indContainer = document.getElementById("industries-container");
+        indContainer.innerHTML = ""; 
+
+        if (typeof branscher === 'undefined' || !branscher) {
+            console.error("Listan 'branscher' hittades inte i koden.");
+            return;
+        }
+
+        const beraknadeBranscher = branscher.map(b => {
+            let totalScore = 0;
+            let egenskaperArray = [];
+            
+            // Universell lösning: Hanterar både array [2,5,8] och textsträng "2,5,8"
+            if (b.viktigaEgenskaper && Array.isArray(b.viktigaEgenskaper)) {
+                egenskaperArray = b.viktigaEgenskaper;
+            } else if (b.egenskaperText && typeof b.egenskaperText === 'string') {
+                egenskaperArray = b.egenskaperText.split(",").map(Number);
+            } else if (b.viktigaEgenskaper) {
+                egenskaperArray = String(b.viktigaEgenskaper).split(",").map(Number);
+            }
+            
+            // Räkna ut poäng (om en fråga inte är besvarad sätts den till 0)
+            egenskaperArray.forEach(index => {
+                totalScore += (userAnswers[index] || 0);
+            });
+            
+            // Räkna ut procent baserat på max 15 poäng (3 egenskaper * max 5 poäng)
+            const procent = Math.round((totalScore / 15) * 100);
+            return { ...b, procent: procent };
+        });
+
+        // Sortera så att branschen med högst matchning hamnar först
+        beraknadeBranscher.sort((a, b) => b.procent - a.procent);
+
+        // Generera HTML-korten för varje bransch
+        beraknadeBranscher.forEach((b, idx) => {
+            const isTop = idx === 0;
+            const card = document.createElement("div");
+            card.className = `industry-card ${isTop ? 'top-match' : ''}`;
+            
+            // Skapa yrkestaggar säkert
+            let yrkesTags = "";
+            if (b.yrken && Array.isArray(b.yrken)) {
+                yrkesTags = b.yrken.map(y => `<span class="job-tag">${y}</span>`).join("");
+            }
+
+            card.innerHTML = `
+                <div class="industry-header">
+                    <span>${b.namn || 'Okänd bransch'}</span>
+                    ${isTop ? '<span class="top-badge">Bästa matchning!</span>' : `<span style="font-size:14px; color:#64748b;">${b.procent}%</span>`}
+                </div>
+                <div class="industry-desc">${b.desc || ''}</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: ${b.procent}%"></div>
+                </div>
+                <div class="jobs-container">
+                    ${yrkesTags}
+                </div>
+            `;
+            indContainer.appendChild(card);
+        });
+    }
+
+
+    function ritaNativeRadardiagram() {
+        const canvas = document.getElementById("myCanvas");
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = 160;
+        const totalAxes = labels.length;
+
+        // Rita bakgrundscirklar
+        ctx.strokeStyle = "#e2e8f0";
+        ctx.lineWidth = 1;
+        for (let i = 1; i <= 5; i++) {
+            ctx.beginPath();
+            const r = (radius / 5) * i;
+            for (let j = 0; j <= totalAxes; j++) {
+                const angle = (j * 2 * Math.PI) / totalAxes - Math.PI / 2;
+                const x = centerX + r * Math.cos(angle);
+                const y = centerY + r * Math.sin(angle);
+                if (j === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+        }
+
+        // Axlar och text
+        ctx.fillStyle = "#475569";
+        ctx.font = "11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        labels.forEach((label, i) => {
+            const angle = (i * 2 * Math.PI) / totalAxes - Math.PI / 2;
+            const lineX = centerX + radius * Math.cos(angle);
+            const lineY = centerY + radius * Math.sin(angle);
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(lineX, lineY);
+            ctx.stroke();
+
+            const textX = centerX + (radius + 25) * Math.cos(angle);
+            const textY = centerY + (radius + 15) * Math.sin(angle);
+            ctx.fillText(label, textX, textY);
+        });
+
+        // Rita linjer för svaren
+        ctx.beginPath();
+        labels.forEach((label, i) => {
+            const score = userAnswers[i] || 1; 
+            const r = (radius / 5) * score;
+            const angle = (i * 2 * Math.PI) / totalAxes - Math.PI / 2;
+            const x = centerX + r * Math.cos(angle);
+            const y = centerY + r * Math.sin(angle);
+            
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        
+        ctx.fillStyle = "rgba(52, 152, 219, 0.4)";
+        ctx.fill();
+        ctx.strokeStyle = "#3498db";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Rita punkter på hörnen
+        labels.forEach((label, i) => {
+            const score = userAnswers[i] || 1;
+            const r = (radius / 5) * score;
+            const angle = (i * 2 * Math.PI) / totalAxes - Math.PI / 2;
+            const x = centerX + r * Math.cos(angle);
+            const y = centerY + r * Math.sin(angle);
+            
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = "#2980b9";
+            ctx.fill();
+        });
+    }
+</script>
+
+</body>
+</html>
